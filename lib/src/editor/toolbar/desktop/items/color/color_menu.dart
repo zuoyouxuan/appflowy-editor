@@ -18,7 +18,7 @@ void showColorMenu(
 
   // should abstract this logic to a method
   // ----
-  final left = rect.left + 10;
+  final left = rect.left + 10 + 450;
   double? top;
   double? bottom;
   final offset = rect.center;
