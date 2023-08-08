@@ -207,7 +207,7 @@ class SelectionMenu extends SelectionMenuService {
     final topRight = rect.topRight;
     var offset = bottomRight + menuOffset;
     _offset = Offset(
-      offset.dx,
+      offset.dx - 450,
       offset.dy,
     );
 
@@ -223,16 +223,16 @@ class SelectionMenu extends SelectionMenuService {
     }
 
     // show on left
-    // if (_offset.dx > editorWidth / 2) {
-    //   _alignment = _alignment == Alignment.topLeft
-    //       ? Alignment.topRight
-    //       : Alignment.bottomRight;
-    //
-    //   _offset = Offset(
-    //     editorWidth - _offset.dx,
-    //     _offset.dy,
-    //   );
-    // }
+    if (_offset.dx > editorWidth / 2) {
+      _alignment = _alignment == Alignment.topLeft
+          ? Alignment.topRight
+          : Alignment.bottomRight;
+
+      _offset = Offset(
+        editorWidth - _offset.dx,
+        _offset.dy,
+      );
+    }
   }
 }
 
