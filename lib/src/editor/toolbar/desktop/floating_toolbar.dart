@@ -240,7 +240,7 @@ class _FloatingToolbarState extends State<FloatingToolbar>
     final threshold = width / 3.0;
     final top = (rect.top < floatingToolbarHeight
         ? rect.bottom + floatingToolbarHeight
-        : rect.top) + 10;
+        : rect.top) - 10;
     if (rectLeft >= threshold && rect.right <= threshold * 2.0) {
       // show in center
       return (threshold, top, null);
