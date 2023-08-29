@@ -225,30 +225,57 @@ class _FloatingToolbarState extends State<FloatingToolbar>
   }
 
   (double? left, double top, double? right) calculateToolbarOffset(Rect rect) {
+
     final editorOffset =
         editorState.renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
     final editorSize = editorState.renderBox?.size ?? Size.zero;
     final editorRect = editorOffset & editorSize;
+    final editorCenter = editorRect.center;
+    final rectLeft = rect.left - 450;
 
-    final rectLeft = rect.left - 700;
+    final left = (rectLeft - editorCenter.dx).abs();
+    final right = (rect.right - editorCenter.dx).abs();
 
-    final left = (rectLeft - editorOffset.dx).abs();
-    final right = (rect.right - editorOffset.dx).abs();
     final width = editorSize.width;
     final threshold = width / 3.0;
-
-    final top = rect.top < floatingToolbarHeight
+    final top = (rect.top < floatingToolbarHeight
         ? rect.bottom + floatingToolbarHeight
-        : rect.top;
-    if (left <= threshold) {
+        : rect.top) + 10;
+    if (rectLeft >= threshold && rect.right <= threshold * 2.0) {
+      // show in center
+      return (threshold, top, null);
+    } else if (left >= right && rectLeft <= threshold) {
       // show in left
       return (rectLeft, top, null);
-    } else if (left >= threshold && right <= threshold * 2.0) {
-      // show in center
-      return (editorRect.left + threshold, top, null);
     } else {
       // show in right
       return (null, top, editorRect.right - rect.right);
     }
+    //
+    // final editorOffset =
+    //     editorState.renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+    // final editorSize = editorState.renderBox?.size ?? Size.zero;
+    // final editorRect = editorOffset & editorSize;
+    //
+    // final rectLeft = rect.left - 700;
+    //
+    // final left = (rectLeft - editorOffset.dx).abs();
+    // final right = (rect.right - editorOffset.dx).abs();
+    // final width = editorSize.width;
+    // final threshold = width / 3.0;
+    //
+    // final top = rect.top < floatingToolbarHeight
+    //     ? rect.bottom + floatingToolbarHeight
+    //     : rect.top;
+    // if (left <= threshold) {
+    //   // show in left
+    //   return (rectLeft, top, null);
+    // } else if (left >= threshold && right <= threshold * 2.0) {
+    //   // show in center
+    //   return (threshold, top, null);
+    // } else {
+    //   // show in right
+    //   return (null, top, editorRect.right - rect.right);
+    // }
   }
 }
