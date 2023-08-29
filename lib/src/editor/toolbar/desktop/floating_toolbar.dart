@@ -230,7 +230,7 @@ class _FloatingToolbarState extends State<FloatingToolbar>
     final editorSize = editorState.renderBox?.size ?? Size.zero;
     final editorRect = editorOffset & editorSize;
 
-    final rectLeft = rect.left - 450;
+    final rectLeft = rect.left - 700;
 
     final left = (rectLeft - editorOffset.dx).abs();
     final right = (rect.right - editorOffset.dx).abs();
