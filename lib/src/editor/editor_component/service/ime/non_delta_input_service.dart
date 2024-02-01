@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
@@ -12,6 +13,7 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
     required super.onReplace,
     required super.onNonTextUpdate,
     required super.onPerformAction,
+    super.contentInsertionConfiguration,
     super.onFloatingCursor,
   });
 
@@ -170,7 +172,14 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
   }
 
   @override
-  void insertContent(KeyboardInsertedContent content) {}
+  void insertContent(KeyboardInsertedContent content) {
+    assert(
+      contentInsertionConfiguration?.allowedMimeTypes
+              .contains(content.mimeType) ??
+          false,
+    );
+    contentInsertionConfiguration?.onContentInserted.call(content);
+  }
 
   void _updateComposing(TextEditingDelta delta) {
     if (delta is! TextEditingDeltaNonTextUpdate) {
@@ -194,7 +203,7 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
     }
 
     // solve the issue where the Chinese IME doesn't continue deleting after the input content has been deleted.
-    if (composingTextRange?.isCollapsed ?? false) {
+    if (Platform.isMacOS && (composingTextRange?.isCollapsed ?? false)) {
       composingTextRange = TextRange.empty;
     }
   }
