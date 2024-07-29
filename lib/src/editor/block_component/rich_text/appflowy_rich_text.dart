@@ -1,18 +1,7 @@
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:appflowy_editor/src/core/document/attributes.dart';
-import 'package:appflowy_editor/src/core/document/node.dart';
-import 'package:appflowy_editor/src/core/document/path.dart';
-import 'package:appflowy_editor/src/core/document/text_delta.dart';
-import 'package:appflowy_editor/src/core/location/position.dart';
-import 'package:appflowy_editor/src/core/location/selection.dart';
-import 'package:appflowy_editor/src/editor/block_component/base_component/selection/block_selection_container.dart';
-import 'package:appflowy_editor/src/editor/block_component/rich_text/appflowy_rich_text_keys.dart';
-import 'package:appflowy_editor/src/editor/util/color_util.dart';
-import 'package:appflowy_editor/src/editor_state.dart';
-import 'package:appflowy_editor/src/extensions/text_style_extension.dart';
-import 'package:appflowy_editor/src/render/selection/selectable.dart';
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -122,6 +111,9 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   bool get enableAutoComplete =>
       widget.editorState.enableAutoComplete && autoCompleteTextProvider != null;
 
+  TextStyleConfiguration get textStyleConfiguration =>
+      widget.editorState.editorStyle.textStyleConfiguration;
+
   @override
   Widget build(BuildContext context) {
     Widget child = _buildRichText(context);
@@ -196,7 +188,7 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     var cursorOffset =
         _renderParagraph?.getOffsetForCaret(textPosition, Rect.zero) ??
             Offset.zero;
-    if (cursorHeight == null) {
+    if (delta?.isEmpty == true || cursorHeight == null || cursorHeight == 0) {
       cursorHeight =
           _placeholderRenderParagraph?.getFullHeightForCaret(textPosition);
       cursorOffset = _placeholderRenderParagraph?.getOffsetForCaret(
@@ -238,6 +230,22 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   }
 
   @override
+  Selection? getWordEdgeInOffset(Offset offset) {
+    final localOffset = _renderParagraph?.globalToLocal(offset) ?? Offset.zero;
+    final textPosition = _renderParagraph?.getPositionForOffset(localOffset) ??
+        const TextPosition(offset: 0);
+    final textRange =
+        _renderParagraph?.getWordBoundary(textPosition) ?? TextRange.empty;
+    final wordEdgeOffset = textPosition.offset <= textRange.start
+        ? textRange.start
+        : textRange.end;
+
+    return Selection.collapsed(
+      Position(path: widget.node.path, offset: wordEdgeOffset),
+    );
+  }
+
+  @override
   Selection? getWordBoundaryInOffset(Offset offset) {
     final localOffset = _renderParagraph?.globalToLocal(offset) ?? Offset.zero;
     final textPosition = _renderParagraph?.getPositionForOffset(localOffset) ??
@@ -263,15 +271,17 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   List<Rect> getRectsInSelection(
     Selection selection, {
     bool shiftWithBaseOffset = false,
+    RenderParagraph? paragraph,
   }) {
-    if (kDebugMode && _renderParagraph?.debugNeedsLayout == true) {
+    paragraph ??= _renderParagraph;
+    if (kDebugMode && paragraph?.debugNeedsLayout == true) {
       return [];
     }
     final textSelection = textSelectionFromEditorSelection(selection);
     if (textSelection == null) {
       return [];
     }
-    final rects = _renderParagraph
+    final rects = paragraph
         ?.getBoxesForSelection(
           textSelection,
           boxHeightStyle: BoxHeightStyle.max,
@@ -283,7 +293,7 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       // If the rich text widget does not contain any text,
       // there will be no selection boxes,
       // so we need to return to the default selection.
-      return [Rect.fromLTWH(0, 0, 0, _renderParagraph?.size.height ?? 0)];
+      return [Rect.fromLTWH(0, 0, 0, paragraph?.size.height ?? 0)];
     }
     return rects;
   }
@@ -325,16 +335,21 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   }
 
   Widget _buildPlaceholderText(BuildContext context) {
-    final textSpan = getPlaceholderTextSpan();
+    var textSpan = getPlaceholderTextSpan();
+    if (widget.placeholderTextSpanDecorator != null) {
+      textSpan = widget.placeholderTextSpanDecorator!(textSpan);
+    }
+    textSpan = adjustTextSpan(textSpan);
     return RichText(
       key: placeholderTextKey,
-      textHeightBehavior: const TextHeightBehavior(
-        applyHeightToFirstAscent: false,
-        applyHeightToLastDescent: false,
+      textHeightBehavior: TextHeightBehavior(
+        applyHeightToFirstAscent:
+            textStyleConfiguration.applyHeightToFirstAscent,
+        applyHeightToLastDescent:
+            textStyleConfiguration.applyHeightToLastDescent,
+        leadingDistribution: textStyleConfiguration.leadingDistribution,
       ),
-      text: widget.placeholderTextSpanDecorator != null
-          ? widget.placeholderTextSpanDecorator!(textSpan)
-          : textSpan,
+      text: textSpan,
       textDirection: textDirection(),
       textScaler:
           TextScaler.linear(widget.editorState.editorStyle.textScaleFactor),
@@ -344,16 +359,21 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   Widget _buildRichText(BuildContext context) {
     final textInserts = widget.node.delta!.whereType<TextInsert>();
     TextSpan textSpan = getTextSpan(textInserts: textInserts);
+    if (widget.textSpanDecorator != null) {
+      textSpan = widget.textSpanDecorator!(textSpan);
+    }
+    textSpan = adjustTextSpan(textSpan);
     return RichText(
       key: textKey,
       textAlign: widget.textAlign ?? TextAlign.start,
-      textHeightBehavior: const TextHeightBehavior(
-        applyHeightToFirstAscent: false,
-        applyHeightToLastDescent: false,
+      textHeightBehavior: TextHeightBehavior(
+        applyHeightToFirstAscent:
+            textStyleConfiguration.applyHeightToFirstAscent,
+        applyHeightToLastDescent:
+            textStyleConfiguration.applyHeightToLastDescent,
+        leadingDistribution: textStyleConfiguration.leadingDistribution,
       ),
-      text: widget.textSpanDecorator != null
-          ? widget.textSpanDecorator!(textSpan)
-          : textSpan,
+      text: textSpan,
       textDirection: textDirection(),
       textScaler:
           TextScaler.linear(widget.editorState.editorStyle.textScaleFactor),
@@ -363,6 +383,10 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   Widget _buildAutoCompleteRichText() {
     final textInserts = widget.node.delta!.whereType<TextInsert>();
     TextSpan textSpan = getTextSpan(textInserts: textInserts);
+    if (widget.textSpanDecorator != null) {
+      textSpan = widget.textSpanDecorator!(textSpan);
+    }
+    textSpan = adjustTextSpan(textSpan);
     return ValueListenableBuilder(
       valueListenable: widget.editorState.selectionNotifier,
       builder: (_, __, ___) {
@@ -394,13 +418,14 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
         );
         return RichText(
           textAlign: widget.textAlign ?? TextAlign.start,
-          textHeightBehavior: const TextHeightBehavior(
-            applyHeightToFirstAscent: false,
-            applyHeightToLastDescent: false,
+          textHeightBehavior: TextHeightBehavior(
+            applyHeightToFirstAscent:
+                textStyleConfiguration.applyHeightToFirstAscent,
+            applyHeightToLastDescent:
+                textStyleConfiguration.applyHeightToLastDescent,
+            leadingDistribution: textStyleConfiguration.leadingDistribution,
           ),
-          text: widget.textSpanDecorator != null
-              ? widget.textSpanDecorator!(textSpan)
-              : textSpan,
+          text: textSpan,
           textDirection: textDirection(),
           textScaler:
               TextScaler.linear(widget.editorState.editorStyle.textScaleFactor),
@@ -409,13 +434,47 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     );
   }
 
+  // https://github.com/flutter/flutter/pull/143954
+  // https://github.com/AppFlowy-IO/appflowy-editor/issues/819#issuecomment-2177833413
+  // This is a workaround for the issue that
+  //  the caret height of the text is not calculated correctly if the parent style is null.
+  TextSpan adjustTextSpan(TextSpan textSpan) {
+    if (textSpan.style == null && textSpan.children != null) {
+      double height = 0.0;
+      double fontSize = 0.0;
+      textSpan.visitChildren((span) {
+        final style = span.style;
+        if (style != null) {
+          if (style.height != null) {
+            height = max(height, style.height!);
+          }
+          if (style.fontSize != null) {
+            fontSize = max(fontSize, style.fontSize!);
+          }
+        }
+        return true;
+      });
+      if (height == 0.0 || fontSize == 0.0) {
+        return textSpan;
+      }
+      textSpan = textSpan.copyWith(
+        style: textStyleConfiguration.text.copyWith(
+          height: height,
+          fontSize: fontSize,
+        ),
+      );
+    }
+    return textSpan;
+  }
+
   TextSpan getPlaceholderTextSpan() {
-    final style = widget.editorState.editorStyle.textStyleConfiguration;
     return TextSpan(
       children: [
         TextSpan(
           text: widget.placeholderText,
-          style: style.text.copyWith(height: widget.lineHeight),
+          style: textStyleConfiguration.text.copyWith(
+            height: textStyleConfiguration.lineHeight,
+          ),
         ),
       ],
     );
@@ -426,28 +485,29 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
   }) {
     int offset = 0;
     List<InlineSpan> textSpans = [];
-    final style = widget.editorState.editorStyle.textStyleConfiguration;
     for (final textInsert in textInserts) {
-      TextStyle textStyle = style.text.copyWith(height: widget.lineHeight);
+      TextStyle textStyle = textStyleConfiguration.text.copyWith(
+        height: textStyleConfiguration.lineHeight,
+      );
       final attributes = textInsert.attributes;
       if (attributes != null) {
         if (attributes.bold == true) {
-          textStyle = textStyle.combine(style.bold);
+          textStyle = textStyle.combine(textStyleConfiguration.bold);
         }
         if (attributes.italic == true) {
-          textStyle = textStyle.combine(style.italic);
+          textStyle = textStyle.combine(textStyleConfiguration.italic);
         }
         if (attributes.underline == true) {
-          textStyle = textStyle.combine(style.underline);
+          textStyle = textStyle.combine(textStyleConfiguration.underline);
         }
         if (attributes.strikethrough == true) {
-          textStyle = textStyle.combine(style.strikethrough);
+          textStyle = textStyle.combine(textStyleConfiguration.strikethrough);
         }
         if (attributes.href != null) {
-          textStyle = textStyle.combine(style.href);
+          textStyle = textStyle.combine(textStyleConfiguration.href);
         }
         if (attributes.code == true) {
-          textStyle = textStyle.combine(style.code);
+          textStyle = textStyle.combine(textStyleConfiguration.code);
         }
         if (attributes.backgroundColor != null) {
           textStyle = textStyle.combine(
@@ -475,7 +535,7 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
           );
         }
         if (attributes.autoComplete == true) {
-          textStyle = textStyle.combine(style.autoComplete);
+          textStyle = textStyle.combine(textStyleConfiguration.autoComplete);
         }
         if (attributes.transparent == true) {
           textStyle = textStyle.combine(

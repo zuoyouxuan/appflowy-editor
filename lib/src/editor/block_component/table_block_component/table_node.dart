@@ -70,7 +70,7 @@ class TableNode {
     assert(cols[0].isNotEmpty);
     assert(cols.every((col) => col.length == cols[0].length));
 
-    config = config ?? const TableConfig();
+    config = config ?? TableConfig();
 
     Node node = Node(
       type: TableBlockKeys.type,
@@ -168,6 +168,7 @@ class TableNode {
 
   void updateRowHeight(
     int row, {
+    EditorState? editorState,
     Transaction? transaction,
   }) {
     // The extra 8 is because of paragraph padding
@@ -192,6 +193,9 @@ class TableNode {
     if (node.attributes[TableBlockKeys.colsHeight] != colsHeight) {
       if (transaction != null) {
         transaction.updateNode(node, {TableBlockKeys.colsHeight: colsHeight});
+        if (editorState != null && editorState.editable != true) {
+          node.updateAttributes({TableBlockKeys.colsHeight: colsHeight});
+        }
       } else {
         node.updateAttributes({TableBlockKeys.colsHeight: colsHeight});
       }

@@ -9,6 +9,9 @@ import 'package:html/parser.dart' show parse;
 class DocumentHTMLDecoder extends Converter<String, Document> {
   DocumentHTMLDecoder();
 
+  // Set to true to enable parsing color from HTML
+  static bool enableColorParse = true;
+
   @override
   Document convert(String input) {
     final document = parse(input);
@@ -54,7 +57,7 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
         }
         delta.insert(domNode.text);
       } else {
-        assert(false, 'Unknown node type: $domNode');
+        Log.editor.debug('Unknown node type: $domNode');
       }
     }
     if (delta.isNotEmpty) {
@@ -418,7 +421,7 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
 
     // background color
     final backgroundColor = css['background-color'];
-    if (backgroundColor != null) {
+    if (enableColorParse && backgroundColor != null) {
       final highlightColor = backgroundColor.tryToColor()?.toHex();
       if (highlightColor != null) {
         attributes[AppFlowyRichTextKeys.backgroundColor] = highlightColor;
@@ -427,7 +430,7 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
 
     // background
     final background = css['background'];
-    if (background != null) {
+    if (enableColorParse && background != null) {
       final highlightColor = background.tryToColor()?.toHex();
       if (highlightColor != null) {
         attributes[AppFlowyRichTextKeys.backgroundColor] = highlightColor;
@@ -436,7 +439,7 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
 
     // color
     final color = css['color'];
-    if (color != null) {
+    if (enableColorParse && color != null) {
       final textColor = color.tryToColor()?.toHex();
       if (textColor != null) {
         attributes[AppFlowyRichTextKeys.textColor] = textColor;
@@ -473,7 +476,9 @@ class HTMLTags {
   static const h1 = 'h1';
   static const h2 = 'h2';
   static const h3 = 'h3';
-  static const br = 'br';
+  static const h4 = 'h4';
+  static const h5 = 'h5';
+  static const h6 = 'h6';
   static const orderedList = 'ol';
   static const unorderedList = 'ul';
   static const list = 'li';
@@ -488,6 +493,7 @@ class HTMLTags {
   static const del = 'del';
   static const strong = 'strong';
   static const checkbox = 'input';
+  static const br = 'br';
   static const span = 'span';
   static const code = 'code';
   static const blockQuote = 'blockquote';
@@ -520,6 +526,9 @@ class HTMLTags {
     HTMLTags.h1,
     HTMLTags.h2,
     HTMLTags.h3,
+    HTMLTags.h4,
+    HTMLTags.h5,
+    HTMLTags.h6,
     HTMLTags.unorderedList,
     HTMLTags.orderedList,
     HTMLTags.div,

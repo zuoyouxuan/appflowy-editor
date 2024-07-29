@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' hide Overlay, OverlayEntry;
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:provider/provider.dart';
@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/editor/editor_component/service/selection/mobile_selection_service.dart';
 import 'package:appflowy_editor/src/editor/editor_component/service/selection/shared.dart';
-import 'package:appflowy_editor/src/flutter/overlay.dart';
 import 'package:appflowy_editor/src/service/selection/selection_gesture.dart';
 
 class DesktopSelectionServiceWidget extends StatefulWidget {
@@ -14,14 +13,16 @@ class DesktopSelectionServiceWidget extends StatefulWidget {
     super.key,
     this.cursorColor = const Color(0xFF00BCF0),
     this.selectionColor = const Color(0xFF00BCF0),
-    required this.contextMenuItems,
+    this.contextMenuItems,
     required this.child,
+    this.dropTargetStyle = const AppFlowyDropTargetStyle(),
   });
 
   final Widget child;
   final Color cursorColor;
   final Color selectionColor;
-  final List<List<ContextMenuItem>> contextMenuItems;
+  final List<List<ContextMenuItem>>? contextMenuItems;
+  final AppFlowyDropTargetStyle dropTargetStyle;
 
   @override
   State<DesktopSelectionServiceWidget> createState() =>
@@ -51,6 +52,8 @@ class _DesktopSelectionServiceWidgetState
   double? _panStartScrollDy;
 
   Position? _panStartPosition;
+
+  OverlayEntry? _dropTargetEntry;
 
   late EditorState editorState = Provider.of<EditorState>(
     context,
@@ -85,7 +88,7 @@ class _DesktopSelectionServiceWidgetState
     WidgetsBinding.instance.removeObserver(this);
     editorState.selectionNotifier.removeListener(_updateSelection);
     currentSelection.dispose();
-
+    removeDropTarget();
     super.dispose();
   }
 
@@ -294,7 +297,7 @@ class _DesktopSelectionServiceWidgetState
       return;
     }
 
-    _panStartOffset = details.globalPosition.translate(-3.0, 0);
+    _panStartOffset = details.globalPosition.translate(-5.0, 0);
     _panStartScrollDy = editorState.service.scrollService?.dy;
 
     _panStartPosition = getNodeInOffset(_panStartOffset!)
@@ -363,6 +366,11 @@ class _DesktopSelectionServiceWidgetState
   void _showContextMenu(TapDownDetails details) {
     _clearContextMenu();
 
+    // Don't trigger the context menu if there are no items
+    if (widget.contextMenuItems == null || widget.contextMenuItems!.isEmpty) {
+      return;
+    }
+
     // only shows around the selection area.
     if (selectionRects.isEmpty) {
       return;
@@ -394,13 +402,13 @@ class _DesktopSelectionServiceWidgetState
       builder: (context) => ContextMenu(
         position: offset,
         editorState: editorState,
-        items: widget.contextMenuItems,
+        items: widget.contextMenuItems!,
         onPressed: () => _clearContextMenu(),
       ),
     );
 
     _contextMenuAreas.add(contextMenu);
-    Overlay.of(context, rootOverlay: true)?.insert(contextMenu);
+    Overlay.of(context, rootOverlay: true).insert(contextMenu);
   }
 
   @override
@@ -411,5 +419,94 @@ class _DesktopSelectionServiceWidgetState
   @override
   void unregisterGestureInterceptor(String key) {
     _interceptors.removeWhere((element) => element.key == key);
+  }
+
+  @override
+  void removeDropTarget() {
+    _dropTargetEntry?.remove();
+    _dropTargetEntry = null;
+  }
+
+  @override
+  void renderDropTargetForOffset(Offset offset) {
+    removeDropTarget();
+
+    final node = getNodeInOffset(offset);
+    final selectable = node?.selectable;
+    if (selectable == null) {
+      return;
+    }
+
+    final blockRect = selectable.getBlockRect();
+    final startRect = blockRect.topLeft;
+    final endRect = blockRect.bottomLeft;
+
+    final renderBox = selectable.context.findRenderObject() as RenderBox;
+    final globalStartRect = renderBox.localToGlobal(startRect);
+    final globalEndRect = renderBox.localToGlobal(endRect);
+
+    final topDistance = (globalStartRect - offset).distanceSquared;
+    final bottomDistance = (globalEndRect - offset).distanceSquared;
+
+    final isCloserToStart = topDistance < bottomDistance;
+
+    _dropTargetEntry = OverlayEntry(
+      builder: (context) {
+        final overlayRenderBox =
+            Overlay.of(context).context.findRenderObject() as RenderBox;
+        final editorRenderBox =
+            selectable.context.findRenderObject() as RenderBox;
+
+        final editorOffset = editorRenderBox.localToGlobal(
+          Offset.zero,
+          ancestor: overlayRenderBox,
+        );
+
+        final indicatorTop =
+            (isCloserToStart ? startRect.dy : endRect.dy) + editorOffset.dy;
+
+        final width = blockRect.topRight.dx - startRect.dx;
+        return Positioned(
+          top: indicatorTop,
+          left: startRect.dx + editorOffset.dx,
+          child: Container(
+            height: widget.dropTargetStyle.height,
+            width: width,
+            margin: widget.dropTargetStyle.margin,
+            constraints: widget.dropTargetStyle.constraints,
+            decoration: BoxDecoration(
+              borderRadius:
+                  BorderRadius.circular(widget.dropTargetStyle.borderRadius),
+              color: widget.dropTargetStyle.color,
+            ),
+          ),
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_dropTargetEntry!);
+  }
+
+  @override
+  DropTargetRenderData? getDropTargetRenderData(Offset offset) {
+    final node = getNodeInOffset(offset);
+    final selectable = node?.selectable;
+    if (selectable == null) {
+      return null;
+    }
+
+    final blockRect = selectable.getBlockRect();
+    final startRect = blockRect.topLeft;
+    final endRect = blockRect.bottomLeft;
+
+    final startDistance = (startRect - offset).distance;
+    final endDistance = (endRect - offset).distance;
+
+    final isCloserToStart = startDistance < endDistance;
+
+    return DropTargetRenderData(
+      dropTarget: isCloserToStart ? node : node?.next ?? node,
+      cursorNode: node,
+    );
   }
 }

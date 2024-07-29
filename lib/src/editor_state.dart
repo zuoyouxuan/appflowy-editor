@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/editor/editor_component/service/scroll/auto_scroller.dart';
 import 'package:appflowy_editor/src/history/undo_manager.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 
 /// the type of this value is bool.
 ///
@@ -258,7 +259,10 @@ class EditorState {
   // the value of the notifier is meaningless, just for triggering the callbacks.
   final ValueNotifier<int> onDispose = ValueNotifier(0);
 
+  bool isDisposed = false;
+
   void dispose() {
+    isDisposed = true;
     _observer.close();
     _debouncedSealHistoryItemTimer?.cancel();
     onDispose.value += 1;
@@ -281,8 +285,9 @@ class EditorState {
     bool isRemote = false,
     ApplyOptions options = const ApplyOptions(recordUndo: true),
     bool withUpdateSelection = true,
+    bool skipHistoryDebounce = false,
   }) async {
-    if (!editable) {
+    if (!editable || isDisposed) {
       return;
     }
 
@@ -308,7 +313,7 @@ class EditorState {
         _observer.add((TransactionTime.after, transaction));
       }
 
-      _recordRedoOrUndo(options, transaction);
+      _recordRedoOrUndo(options, transaction, skipHistoryDebounce);
 
       if (withUpdateSelection) {
         _selectionUpdateReason = SelectionUpdateReason.transaction;
@@ -509,7 +514,11 @@ class EditorState {
     }
   }
 
-  void _recordRedoOrUndo(ApplyOptions options, Transaction transaction) {
+  void _recordRedoOrUndo(
+    ApplyOptions options,
+    Transaction transaction,
+    bool skipDebounce,
+  ) {
     if (options.recordUndo) {
       final undoItem = undoManager.getUndoHistoryItem();
       undoItem.addAll(transaction.operations);
@@ -518,7 +527,13 @@ class EditorState {
         undoItem.beforeSelection = transaction.beforeSelection;
       }
       undoItem.afterSelection = transaction.afterSelection;
-      _debouncedSealHistoryItem();
+      if (skipDebounce && undoManager.undoStack.isNonEmpty) {
+        Log.editor.debug('Seal history item');
+        final last = undoManager.undoStack.last;
+        last.seal();
+      } else {
+        _debouncedSealHistoryItem();
+      }
     } else if (options.recordRedo) {
       final redoItem = HistoryItem();
       redoItem.addAll(transaction.operations);
