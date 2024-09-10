@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -82,34 +84,34 @@ Future<bool> _showSlashMenu(
 
   // insert the slash character
   if (shouldInsertSlash) {
-    if (kIsWeb) {
-      // Have no idea why the focus will lose after inserting on web.
-      keepEditorFocusNotifier.increase();
-      await editorState.insertTextAtPosition('/', position: selection.start);
-      WidgetsBinding.instance.addPostFrameCallback(
-        (timeStamp) => keepEditorFocusNotifier.decrease(),
-      );
-    } else {
-      await editorState.insertTextAtPosition('/', position: selection.start);
-    }
+    keepEditorFocusNotifier.increase();
+    await editorState.insertTextAtPosition('/', position: selection.start);
   }
 
   // show the slash menu
-  () {
-    // this code is copied from the the old editor.
-    final context = editorState.getNodeAtPath(selection.start.path)?.context;
-    if (context != null) {
-      _selectionMenuService = SelectionMenu(
-        context: context,
-        editorState: editorState,
-        selectionMenuItems: items,
-        deleteSlashByDefault: shouldInsertSlash,
-        singleColumn: singleColumn,
-        style: style,
-      );
+
+  final context = editorState.getNodeAtPath(selection.start.path)?.context;
+  if (context != null && context.mounted) {
+    _selectionMenuService = SelectionMenu(
+      context: context,
+      editorState: editorState,
+      selectionMenuItems: items,
+      deleteSlashByDefault: shouldInsertSlash,
+      singleColumn: singleColumn,
+      style: style,
+    );
+    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
       _selectionMenuService?.show();
+    } else {
+      await _selectionMenuService?.show();
     }
-  }();
+  }
+
+  if (shouldInsertSlash) {
+    WidgetsBinding.instance.addPostFrameCallback(
+      (timeStamp) => keepEditorFocusNotifier.decrease(),
+    );
+  }
 
   return true;
 }

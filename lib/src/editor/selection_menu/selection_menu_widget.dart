@@ -11,6 +11,12 @@ typedef SelectionMenuItemHandler = void Function(
   BuildContext context,
 );
 
+typedef SelectionMenuItemNameBuilder = Widget Function(
+  String name,
+  SelectionMenuStyle style,
+  bool isSelected,
+);
+
 /// Selection Menu Item
 class SelectionMenuItem {
   SelectionMenuItem({
@@ -18,15 +24,15 @@ class SelectionMenuItem {
     required this.icon,
     required this.keywords,
     required SelectionMenuItemHandler handler,
+    this.nameBuilder,
   }) : _getName = getName {
     this.handler = (editorState, menuService, context) {
       if (deleteSlash) {
         _deleteSlash(editorState);
       }
-      // WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+
       handler(editorState, menuService, context);
       onSelected?.call();
-      // });
     };
   }
 
@@ -36,6 +42,7 @@ class SelectionMenuItem {
     bool onSelected,
     SelectionMenuStyle style,
   ) icon;
+  final SelectionMenuItemNameBuilder? nameBuilder;
 
   String get name => _getName();
 
@@ -86,10 +93,16 @@ class SelectionMenuItem {
   /// has been inserted.
   factory SelectionMenuItem.node({
     required String Function() getName,
-    required IconData iconData,
     required List<String> keywords,
     required Node Function(EditorState editorState, BuildContext context)
         nodeBuilder,
+    IconData? iconData,
+    Widget Function(
+      EditorState editorState,
+      bool onSelected,
+      SelectionMenuStyle style,
+    )? iconBuilder,
+    SelectionMenuItemNameBuilder? nameBuilder,
     bool Function(EditorState editorState, Node node)? insertBefore,
     bool Function(EditorState editorState, Node node)? replace,
     Selection? Function(
@@ -99,15 +112,28 @@ class SelectionMenuItem {
       bool insertedBefore,
     )? updateSelection,
   }) {
+    // the iconData and iconBuilder are mutually exclusive
+    assert(iconData == null || iconBuilder == null);
+    assert(iconData != null || iconBuilder != null);
+
     return SelectionMenuItem(
       getName: getName,
-      icon: (editorState, onSelected, style) => Icon(
-        iconData,
-        color: onSelected
-            ? style.selectionMenuItemSelectedIconColor
-            : style.selectionMenuItemIconColor,
-        size: 18.0,
-      ),
+      nameBuilder: nameBuilder,
+      icon: (editorState, onSelected, style) {
+        if (iconData != null) {
+          return Icon(
+            iconData,
+            color: onSelected
+                ? style.selectionMenuItemSelectedIconColor
+                : style.selectionMenuItemIconColor,
+            size: 18.0,
+          );
+        } else if (iconBuilder != null) {
+          return iconBuilder.call(editorState, onSelected, style);
+        }
+
+        return const SizedBox.shrink();
+      },
       keywords: keywords,
       handler: (editorState, _, context) {
         final selection = editorState.selection;
@@ -201,6 +227,7 @@ class SelectionMenuWidget extends StatefulWidget {
     required this.itemCountFilter,
     required this.deleteSlashByDefault,
     this.singleColumn = false,
+    this.nameBuilder,
   });
 
   final List<SelectionMenuItem> items;
@@ -217,6 +244,8 @@ class SelectionMenuWidget extends StatefulWidget {
 
   final bool deleteSlashByDefault;
   final bool singleColumn;
+
+  final SelectionMenuItemNameBuilder? nameBuilder;
 
   @override
   State<SelectionMenuWidget> createState() => _SelectionMenuWidgetState();

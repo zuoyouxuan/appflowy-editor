@@ -1,12 +1,10 @@
 import 'dart:math';
 
-import 'package:flutter/material.dart' hide Overlay, OverlayEntry;
-
-import 'package:provider/provider.dart';
-
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/flutter/overlay.dart';
 import 'package:appflowy_editor/src/service/context_menu/built_in_context_menu_item.dart';
+import 'package:flutter/material.dart' hide Overlay, OverlayEntry;
+import 'package:provider/provider.dart';
 
 // workaround for the issue:
 // the popover will grab the focus even if it's inside the editor
@@ -43,6 +41,10 @@ class AppFlowyEditor extends StatefulWidget {
     this.enableAutoComplete = false,
     this.autoCompleteTextProvider,
     this.dropTargetStyle,
+    this.disableSelectionService = false,
+    this.disableKeyboardService = false,
+    this.disableScrollService = false,
+    this.disableAutoScroll = false,
   })  : blockComponentBuilders =
             blockComponentBuilders ?? standardBlockComponentBuilderMap,
         characterShortcutEvents =
@@ -195,6 +197,25 @@ class AppFlowyEditor extends StatefulWidget {
   ///
   final AppFlowyDropTargetStyle? dropTargetStyle;
 
+  /// Disable the selection gesture
+  ///
+  /// It will disable the selection service and the context menu.
+  final bool disableSelectionService;
+
+  /// Disable the keyboard service
+  ///
+  /// It will disable all the keyboard shortcuts and the text input.
+  final bool disableKeyboardService;
+
+  /// Disable the scroll service
+  ///
+  /// It will disable the auto scroll feature.
+  final bool disableScrollService;
+
+  /// Disable auto scroll
+  ///
+  final bool disableAutoScroll;
+
   @override
   State<AppFlowyEditor> createState() => _AppFlowyEditorState();
 }
@@ -283,33 +304,41 @@ class _AppFlowyEditorState extends State<AppFlowyEditor> {
       footer: widget.footer,
     );
 
-    child = KeyboardServiceWidget(
-      key: editorState.service.keyboardServiceKey,
-      // disable all the shortcuts when the editor is not editable
-      characterShortcutEvents:
-          widget.editable ? widget.characterShortcutEvents : [],
-      // only allow copy and select all when the editor is not editable
-      commandShortcutEvents: widget.commandShortcutEvents,
-      focusNode: widget.focusNode,
-      contentInsertionConfiguration: widget.contentInsertionConfiguration,
-      child: child,
-    );
+    if (!widget.disableKeyboardService) {
+      child = KeyboardServiceWidget(
+        key: editorState.service.keyboardServiceKey,
+        // disable all the shortcuts when the editor is not editable
+        characterShortcutEvents:
+            widget.editable ? widget.characterShortcutEvents : [],
+        // only allow copy and select all when the editor is not editable
+        commandShortcutEvents: widget.commandShortcutEvents,
+        focusNode: widget.focusNode,
+        contentInsertionConfiguration: widget.contentInsertionConfiguration,
+        child: child,
+      );
+    }
 
-    child = SelectionServiceWidget(
-      key: editorState.service.selectionServiceKey,
-      cursorColor: widget.editorStyle.cursorColor,
-      selectionColor: widget.editorStyle.selectionColor,
-      showMagnifier: widget.showMagnifier,
-      contextMenuItems: widget.contextMenuItems,
-      dropTargetStyle: widget.dropTargetStyle,
-      child: child,
-    );
+    if (!widget.disableSelectionService) {
+      child = SelectionServiceWidget(
+        key: editorState.service.selectionServiceKey,
+        cursorColor: widget.editorStyle.cursorColor,
+        selectionColor: widget.editorStyle.selectionColor,
+        showMagnifier: widget.showMagnifier,
+        contextMenuItems: widget.contextMenuItems,
+        dropTargetStyle: widget.dropTargetStyle,
+        child: child,
+      );
+    }
 
-    return ScrollServiceWidget(
-      key: editorState.service.scrollServiceKey,
-      editorScrollController: editorScrollController,
-      child: child,
-    );
+    if (!widget.disableScrollService) {
+      child = ScrollServiceWidget(
+        key: editorState.service.scrollServiceKey,
+        editorScrollController: editorScrollController,
+        child: child,
+      );
+    }
+
+    return child;
   }
 
   void _autoFocusIfNeeded() {
@@ -332,6 +361,7 @@ class _AppFlowyEditorState extends State<AppFlowyEditor> {
     editorState.showFooter = widget.footer != null;
     editorState.enableAutoComplete = widget.enableAutoComplete;
     editorState.autoCompleteTextProvider = widget.autoCompleteTextProvider;
+    editorState.disableAutoScroll = widget.disableAutoScroll;
   }
 
   BlockComponentRendererService get _renderer => BlockComponentRenderer(
