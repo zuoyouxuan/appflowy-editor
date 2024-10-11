@@ -197,6 +197,7 @@ extension TextTransaction on Transaction {
     String text, {
     Attributes? attributes,
     Attributes? toggledAttributes,
+    bool sliceAttributes = true,
   }) {
     final delta = node.delta;
     if (delta == null) {
@@ -205,11 +206,14 @@ extension TextTransaction on Transaction {
     }
 
     if (index < 0 || index > delta.length) {
-      Log.editor.info('The index($index) is out of range or negative.');
+      AppFlowyEditorLog.editor
+          .info('The index($index) is out of range or negative.');
       return;
     }
 
-    final newAttributes = attributes ?? delta.sliceAttributes(index) ?? {};
+    final newAttributes = attributes ??
+        (sliceAttributes ? delta.sliceAttributes(index) : {}) ??
+        {};
 
     if (toggledAttributes != null) {
       newAttributes.addAll(toggledAttributes);

@@ -289,14 +289,15 @@ class _DesktopSelectionServiceWidgetState
   void _onPanStart(DragStartDetails details) {
     clearSelection();
 
-    final canPanStart = _interceptors
-        .every((interceptor) => interceptor.canPanStart?.call(details) ?? true);
+    final canPanStart = _interceptors.every(
+      (interceptor) => interceptor.canPanStart?.call(details) ?? true,
+    );
 
     if (!canPanStart) {
       return;
     }
 
-    _panStartOffset = details.globalPosition.translate(-5.0, 0);
+    _panStartOffset = details.globalPosition;
     _panStartScrollDy = editorState.service.scrollService?.dy;
 
     _panStartPosition = getNodeInOffset(_panStartOffset!)
@@ -333,7 +334,10 @@ class _DesktopSelectionServiceWidgetState
       final start = _panStartPosition!;
       final end = last.getSelectionInRange(panStartOffset, panEndOffset).end;
       final selection = Selection(start: start, end: end);
-      updateSelection(selection);
+
+      if (selection != currentSelection.value) {
+        updateSelection(selection);
+      }
     }
 
     editorState.service.scrollService?.startAutoScroll(
@@ -427,30 +431,43 @@ class _DesktopSelectionServiceWidgetState
   }
 
   @override
-  void renderDropTargetForOffset(Offset offset) {
+  void renderDropTargetForOffset(
+    Offset offset, {
+    DragAreaBuilder? builder,
+  }) {
     removeDropTarget();
 
     final node = getNodeInOffset(offset);
     final selectable = node?.selectable;
-    if (selectable == null) {
+    if (node == null || selectable == null) {
       return;
     }
 
     final blockRect = selectable.getBlockRect();
-    final startRect = blockRect.topLeft;
-    final endRect = blockRect.bottomLeft;
+    final startOffset = blockRect.topLeft;
+    final endOffset = blockRect.bottomLeft;
 
     final renderBox = selectable.context.findRenderObject() as RenderBox;
-    final globalStartRect = renderBox.localToGlobal(startRect);
-    final globalEndRect = renderBox.localToGlobal(endRect);
+    final globalStartOffset = renderBox.localToGlobal(startOffset);
+    final globalEndOffset = renderBox.localToGlobal(endOffset);
 
-    final topDistance = (globalStartRect - offset).distanceSquared;
-    final bottomDistance = (globalEndRect - offset).distanceSquared;
+    final topDistance = (globalStartOffset - offset).distanceSquared;
+    final bottomDistance = (globalEndOffset - offset).distanceSquared;
 
     final isCloserToStart = topDistance < bottomDistance;
 
     _dropTargetEntry = OverlayEntry(
       builder: (context) {
+        if (builder != null) {
+          return builder(
+            context,
+            DragAreaBuilderData(
+              targetNode: node,
+              dragOffset: offset,
+            ),
+          );
+        }
+
         final overlayRenderBox =
             Overlay.of(context).context.findRenderObject() as RenderBox;
         final editorRenderBox =
@@ -462,12 +479,12 @@ class _DesktopSelectionServiceWidgetState
         );
 
         final indicatorTop =
-            (isCloserToStart ? startRect.dy : endRect.dy) + editorOffset.dy;
+            (isCloserToStart ? startOffset.dy : endOffset.dy) + editorOffset.dy;
 
-        final width = blockRect.topRight.dx - startRect.dx;
+        final width = blockRect.topRight.dx - startOffset.dx;
         return Positioned(
           top: indicatorTop,
-          left: startRect.dx + editorOffset.dx,
+          left: startOffset.dx + editorOffset.dx,
           child: Container(
             height: widget.dropTargetStyle.height,
             width: width,
@@ -498,13 +515,19 @@ class _DesktopSelectionServiceWidgetState
     final startRect = blockRect.topLeft;
     final endRect = blockRect.bottomLeft;
 
-    final startDistance = (startRect - offset).distance;
-    final endDistance = (endRect - offset).distance;
+    final renderBox = selectable.context.findRenderObject() as RenderBox;
+    final globalStartRect = renderBox.localToGlobal(startRect);
+    final globalEndRect = renderBox.localToGlobal(endRect);
 
-    final isCloserToStart = startDistance < endDistance;
+    final topDistance = (globalStartRect - offset).distanceSquared;
+    final bottomDistance = (globalEndRect - offset).distanceSquared;
+
+    final isCloserToStart = topDistance < bottomDistance;
+
+    final dropPath = isCloserToStart ? node?.path : node?.path.next;
 
     return DropTargetRenderData(
-      dropTarget: isCloserToStart ? node : node?.next ?? node,
+      dropPath: dropPath ?? node?.path,
       cursorNode: node,
     );
   }

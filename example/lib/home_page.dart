@@ -8,6 +8,7 @@ import 'package:example/pages/auto_complete_editor.dart';
 import 'package:example/pages/collab_editor.dart';
 import 'package:example/pages/collab_selection_editor.dart';
 import 'package:example/pages/customize_theme_for_editor.dart';
+import 'package:example/pages/drag_to_reorder_editor.dart';
 import 'package:example/pages/editor.dart';
 import 'package:example/pages/editor_list.dart';
 import 'package:example/pages/fixed_toolbar_editor.dart';
@@ -20,6 +21,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:universal_html/html.dart' as html;
+import 'package:universal_platform/universal_platform.dart';
 
 enum ExportFileType {
   documentJson,
@@ -60,7 +62,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
 
-    _jsonString = PlatformExtension.isDesktopOrWeb
+    _jsonString = UniversalPlatform.isDesktopOrWeb
         ? rootBundle.loadString('assets/example.json')
         : rootBundle.loadString('assets/mobile_example.json');
 
@@ -91,7 +93,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      extendBodyBehindAppBar: PlatformExtension.isDesktopOrWeb,
+      extendBodyBehindAppBar: UniversalPlatform.isDesktopOrWeb,
       drawer: _buildDrawer(context),
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 134, 46, 247),
@@ -123,7 +125,7 @@ class _HomePageState extends State<HomePage> {
           // AppFlowy Editor Demo
           _buildSeparator(context, 'AppFlowy Editor Demo'),
           _buildListTile(context, 'With Example.json', () {
-            final jsonString = PlatformExtension.isDesktopOrWeb
+            final jsonString = UniversalPlatform.isDesktopOrWeb
                 ? rootBundle.loadString('assets/example.json')
                 : rootBundle.loadString('assets/mobile_example.json');
             _loadEditor(context, jsonString);
@@ -166,6 +168,14 @@ class _HomePageState extends State<HomePage> {
 
           // Theme Demo
           _buildSeparator(context, 'Showcases'),
+          _buildListTile(context, 'Drag to reorder', () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const DragToReorderEditor(),
+              ),
+            );
+          }),
           _buildListTile(context, 'Markdown Editor', () {
             Navigator.push(
               context,
@@ -358,7 +368,7 @@ class _HomePageState extends State<HomePage> {
       )
         ..setAttribute('download', 'document.${fileType.extension}')
         ..click();
-    } else if (PlatformExtension.isMobile) {
+    } else if (UniversalPlatform.isMobile) {
       final appStorageDirectory = await getApplicationDocumentsDirectory();
 
       final path = File(

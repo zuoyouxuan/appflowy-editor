@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 
 const errorBlockComponentBuilderKey = 'errorBlockComponentBuilderKey';
 
+// this value is used to force show the block action.
+// it is only for test now.
+bool forceShowBlockAction = false;
+
 typedef BlockActionBuilder = Widget Function(
   BlockComponentContext blockComponentContext,
   BlockComponentActionState state,
@@ -151,7 +155,8 @@ class BlockComponentRenderer extends BlockComponentRendererService {
 
   @override
   void register(String type, BlockComponentBuilder builder) {
-    Log.editor.info('register block component builder for type($type)');
+    AppFlowyEditorLog.editor
+        .info('register block component builder for type($type)');
     if (type.isEmpty) {
       throw ArgumentError('type should not be empty');
     }
